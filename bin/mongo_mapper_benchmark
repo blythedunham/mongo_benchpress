@@ -1,0 +1,230 @@
+#!/usr/bin/env ruby
+#
+# Note: Ruby 1.9 is faster than 1.8, as expected.
+
+#$LOAD_PATH[0,0] = File.join(File.dirname(__FILE__), '..', 'lib')
+require 'rubygems'
+gem 'mongo'
+gem 'mongo_mapper'
+gem 'activesupport'
+
+require 'active_support'
+require 'mongo'
+require 'mongo_mapper'
+
+BASE_CLASS_NAME = 'MongoMapper'
+
+TRIALS = 2
+#PER_TRIAL = 5000
+#BATCH_SIZE = 100
+PER_TRIAL = 50
+BATCH_SIZE=10
+
+host = ENV['MONGO_RUBY_DRIVER_HOST'] || 'localhost'
+port = ENV['MONGO_RUBY_DRIVER_PORT'] || Mongo::Connection::DEFAULT_PORT
+
+puts "#{BASE_CLASS_NAME} Benchmarks for host:#{host} on port:#{port}"
+connection =  Mongo::Connection.new(host, port)
+connection.drop_database("benchmark")
+db = connection.db('benchmark')
+
+
+
+class MongoMapperSmallNone   
+  include MongoMapper::Document
+  database 'small_none'
+  key :x
+end
+
+class MongoMapperMediumNone
+  include MongoMapper::Document
+  database 'medium_none'
+  key :integer, Integer
+  key :number,  Float
+  key :boolean, Boolean
+  key :array,   Array
+  key :x,       Integer
+end
+
+class MongoMapperLargeNone 
+  include MongoMapper::Document
+  database 'large_none'
+  key :base_url, String
+  key :total_word_count, Integer
+  key :access_time, Time
+  key :meta_tags, Hash 
+  key :page_structure, Hash
+  key :harvested_words, Array
+  key :x, Integer
+end
+
+class MongoMapperSmallIndex
+  include MongoMapper::Document
+  database 'small_index'
+  key :x
+  ensure_index :x
+end
+
+class MongoMapperMediumIndex
+  include MongoMapper::Document
+  database 'medium_index'
+  key :integer, Integer
+  key :number,  Float
+  key :boolean, Boolean
+  key :array,   Array
+  key :x,       Integer
+  ensure_index :x
+end
+
+class MongoMapperLargeIndex
+  include MongoMapper::Document
+  database 'large_none'
+  key :base_url, String
+  key :total_word_count, Integer
+  key :access_time, Time
+  key :meta_tags, Hash 
+  key :page_structure, Hash
+  key :harvested_words, Array
+  key :x, Integer
+  ensure_index :x
+end
+
+class MongoMapperSmallBulk
+  include MongoMapper::Document
+  database 'small_bulk'
+  key :x
+end
+
+class MongoMapperMediumNone
+  include MongoMapper::Document
+  database 'medium_bulk'
+  key :integer, Integer
+  key :number,  Float
+  key :boolean, Boolean
+  key :array,   Array
+  key :x,       Integer
+end
+
+class MongoMapperLargeNone 
+  include MongoMapper::Document
+  database 'large_bulk'
+  key :base_url, String
+  key :total_word_count, Integer
+  key :access_time, Time
+  key :meta_tags, Hash 
+  key :page_structure, Hash
+  key :harvested_words, Array
+  key :x, Integer
+end
+
+SMALL = {}
+MEDIUM = {
+  'integer' => 5,
+  'number' => 5.05,
+  'boolean' => false,
+  'array' => ['test', 'benchmark']
+}
+LARGE = {
+  'base_url' => 'http://www.example.com/test-me',
+  'total_word_count' => 6743,
+  'access_time' => Time.now,
+  'meta_tags' => {
+    'description' => 'i am a long description string',
+    'author' => 'Holly Man',
+    'dynamically_created_meta_tag' => 'who know\n what'
+  },
+  'page_structure' => {
+    'counted_tags' => 3450,
+    'no_of_js_attached' => 10,
+    'no_of_images' => 6
+  },
+  'harvested_words' => ['10gen','web','open','source','application','paas',
+                        'platform-as-a-service','technology','helps',
+                        'developers','focus','building','mongodb','mongo'] * 20
+}
+
+def report(str, t = "N/A")
+  result = t.is_a?( String ) ? t : (PER_TRIAL / t).to_i
+  printf("%s%s\n", str.ljust(60, '.'), result )
+end
+
+def benchmark(str, proc, n, db, coll_name, object, setup=nil)
+  return report( str ) if proc.nil?
+  coll = db.collection(coll_name)
+  setup.call(coll, object) if setup
+  coll = (BASE_CLASS_NAME + coll_name.classify).constantize if BASE_CLASS_NAME
+  t0 = Time.new
+  n.times { |i| proc.call(coll, object, i) }
+  report(str, Time.new.to_f - t0.to_f)
+end
+
+
+MongoMapper.connection = connection
+MongoMapper.database = 'benchmark'
+
+
+# ensure all needed indexes are created
+MongoMapper.ensure_indexes!
+
+# handle passenger forking
+if defined?(PhusionPassenger)
+   PhusionPassenger.on_event(:starting_worker_process) do |forked|
+     MongoMapper.database.connect_to_master if forked
+   end
+end
+
+insert = Proc.new { |coll, object, i, klass|
+  record = coll.new( object )
+  record.x = i
+  record.save
+}
+benchmark('insert (small, no index)', insert, PER_TRIAL, db, 'small_none', SMALL)
+benchmark('insert (medium, no index)', insert, PER_TRIAL, db, 'medium_none', MEDIUM)
+benchmark('insert (large, no index)', insert, PER_TRIAL, db, 'large_none', LARGE)
+
+index_on_x = Proc.new { |coll, object, i, klass|
+  #coll.create_index('x')
+}
+
+benchmark('insert (small, indexed)', insert, PER_TRIAL, db, 'small_index', SMALL, index_on_x)
+benchmark('insert (medium, indexed)', insert, PER_TRIAL, db, 'medium_index', MEDIUM, index_on_x)
+benchmark('insert (large, indexed)', insert, PER_TRIAL, db, 'large_index', LARGE, index_on_x)
+
+#insert_batch = Proc.new { |coll, object, i, klass|
+#  record = coll.new
+#  object.x = i
+#  object.insert([object] * BATCH_SIZE)
+#}
+insert_batch = nil
+benchmark('batch insert (small, no index)', insert_batch, PER_TRIAL/BATCH_SIZE, db, 'small_bulk', SMALL)
+benchmark('batch insert (medium, no index)', insert_batch, PER_TRIAL/BATCH_SIZE, db, 'medium_bulk', MEDIUM)
+benchmark('batch insert (large, no index)', insert_batch, PER_TRIAL/BATCH_SIZE, db, 'large_bulk', LARGE)
+
+find_one = Proc.new { |coll, x, i|
+  coll.find_by_x( x )
+}
+benchmark('find_one (small, no index)', find_one, PER_TRIAL, db, 'small_none', PER_TRIAL / 2)
+benchmark('find_one (medium, no index)', find_one, PER_TRIAL, db, 'medium_none', PER_TRIAL / 2)
+benchmark('find_one (large, no index)', find_one, PER_TRIAL, db, 'large_none', PER_TRIAL / 2)
+
+benchmark('find_one (small, indexed)', find_one, PER_TRIAL, db, 'small_index', PER_TRIAL / 2)
+benchmark('find_one (medium, indexed)', find_one, PER_TRIAL, db, 'medium_index', PER_TRIAL / 2)
+benchmark('find_one (large, indexed)', find_one, PER_TRIAL, db, 'large_index', PER_TRIAL / 2)
+
+find = Proc.new { |coll, criteria, i|
+  coll.find(:all, :criteria => {'x' => criteria})
+}
+benchmark('find (small, no index)', find, PER_TRIAL, db, 'small_none', PER_TRIAL / 2)
+benchmark('find (medium, no index)', find, PER_TRIAL, db, 'medium_none', PER_TRIAL / 2)
+benchmark('find (large, no index)', find, PER_TRIAL, db, 'large_none', PER_TRIAL / 2)
+
+benchmark('find (small, indexed)', find, PER_TRIAL, db, 'small_index', PER_TRIAL / 2)
+benchmark('find (medium, indexed)', find, PER_TRIAL, db, 'medium_index', PER_TRIAL / 2)
+benchmark('find (large, indexed)', find, PER_TRIAL, db, 'large_index', PER_TRIAL / 2)
+
+benchmark('find range (small, indexed)', find, PER_TRIAL, db, 'small_index',
+          {"$gt" => PER_TRIAL / 2, "$lt" => PER_TRIAL / 2 + BATCH_SIZE})
+benchmark('find range (medium, indexed)', find, PER_TRIAL, db, 'medium_index',
+          {"$gt" => PER_TRIAL / 2, "$lt" => PER_TRIAL / 2 + BATCH_SIZE})
+benchmark('find range (large, indexed)', find, PER_TRIAL, db, 'large_index',
+          {"$gt" => PER_TRIAL / 2, "$lt" => PER_TRIAL / 2 + BATCH_SIZE})
