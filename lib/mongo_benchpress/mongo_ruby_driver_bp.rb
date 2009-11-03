@@ -11,7 +11,7 @@ module MongoBenchpress
       },
       :insert_batch => Proc.new { |coll, object, i|
         object['x'] = i
-        coll.insert([object] * options[:batch_size])
+        coll.insert(object * i)
       },
       :find_one => Proc.new { |coll, x, i|
         coll.find_one('x' => x)
