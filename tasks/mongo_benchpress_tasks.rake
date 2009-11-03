@@ -25,7 +25,7 @@ namespace :benchpress do
   end
 
   BENCH_PRESS_TASKS.each do |mongo_task|
-    desc "Run benchmarks for #{mongo_task}"
+    desc "Run benchmarks for #{mongo_task} MONGO_RUBY_DRIVER_HOST=localhost MONGO_RUBY_DRIVER_PORT=27017"
     task mongo_task do
       run_benchmark( "#{mongo_task}_benchmark" )
     end
