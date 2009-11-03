@@ -26,7 +26,6 @@ connection = Mongo::Connection.new(host, port)
 connection.drop_database("benchmark")
 MongoRecord::Base.connection = db = connection.db('benchmark')
 
-MongoRecord::Base
 class MongoRecordSmallNone < MongoRecord::Base
   collection_name :small_none
   fields :x
