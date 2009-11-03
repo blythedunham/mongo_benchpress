@@ -1,7 +1,5 @@
 require 'mongo_mapper'
 require File.join( File.dirname(__FILE__), 'base' )
-require File.join( File.dirname(__FILE__), 'models', 'mongo_mapper_models.rb' )
-
 
 module MongoBenchpress
   class MongoMapperBp < MongoBenchpress::Base
@@ -26,6 +24,7 @@ module MongoBenchpress
       super( options )
       ::MongoMapper.connection = self.connection
       ::MongoMapper.database = self.db.name
+      require File.join( File.dirname(__FILE__), 'models', 'mongo_mapper_models.rb' )
     end
   end
 end
