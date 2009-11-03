@@ -26,7 +26,8 @@ connection =  Mongo::Connection.new(host, port)
 connection.drop_database("benchmark")
 db = connection.db('benchmark')
 
-
+MongoMapper.connection = connection
+MongoMapper.database = 'benchmark'
 
 class MongoMapperSmallNone   
   include MongoMapper::Document
