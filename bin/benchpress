@@ -1,0 +1,28 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+gem 'mongo'
+gem 'activesupport'
+
+begin
+  require File.join(File.dirname(__FILE__), '..', 'lib', 'mongo_benchpress')
+rescue LoadError => e
+  gem 'mongo_benchpress'
+  require 'mongo_benchpress'
+end
+
+options = {
+  :host => ENV['MONGO_RUBY_DRIVER_HOST'] || 'localhost',
+  :port => ENV['MONGO_RUBY_DRIVER_PORT'] || Mongo::Connection::DEFAULT_PORT,
+  :verbose => true,
+  :per_trial => 5
+}
+
+#require 'mongo_benchpress/mongo_ruby_driver_bp'
+#results << MongoBenchpress::MongoRubyDriverBp.run( options )
+
+#require 'mongo_benchpress/mongo_mapper_bp'
+#results << MongoBenchpress::MongoMapperBp.run( options )
+
+MongoBenchpress::Base.run_suite( :mongo_ruby_driver, :mongo_mapper, :mongo_record, options )
+
