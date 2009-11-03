@@ -154,8 +154,9 @@ benchmark('find_one (medium, indexed)', find_one, PER_TRIAL, db, 'medium_index',
 benchmark('find_one (large, indexed)', find_one, PER_TRIAL, db, 'large_index', PER_TRIAL / 2)
 
 find = Proc.new { |coll, criteria, i|
-  coll.find(:all, :criteria => {'x' => criteria})
+  coll.find(:all, :criteria => {'x' => criteria}).each{}
 }
+
 benchmark('find (small, no index)', find, PER_TRIAL, db, 'small_none', PER_TRIAL / 2)
 benchmark('find (medium, no index)', find, PER_TRIAL, db, 'medium_none', PER_TRIAL / 2)
 benchmark('find (large, no index)', find, PER_TRIAL, db, 'large_none', PER_TRIAL / 2)
