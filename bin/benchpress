@@ -14,8 +14,7 @@ end
 options = {
   :host => ENV['MONGO_RUBY_DRIVER_HOST'] || 'localhost',
   :port => ENV['MONGO_RUBY_DRIVER_PORT'] || Mongo::Connection::DEFAULT_PORT,
-  :verbose => true,
-  :per_trial => 5
+  :verbose => true
 }
 
 #require 'mongo_benchpress/mongo_ruby_driver_bp'
